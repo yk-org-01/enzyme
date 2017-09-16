@@ -1,4 +1,4 @@
-import './_helpers/setupAdapters';
+import './_helpers/setup';
 import { expect } from 'chai';
 import React from 'react';
 import {

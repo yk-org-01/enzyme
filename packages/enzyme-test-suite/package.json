@@ -33,7 +33,8 @@
     "enzyme-adapter-utils": "^1.0.0-beta.2",
     "prop-types": "^15.5.10",
     "semver": "^5.4.1",
-    "sinon": "^2.4.1"
+    "sinon": "^2.4.1",
+    "airbnb-browser-shims": "^1.12.0"
   },
   "peerDependencies": {
     "react": "^15.5.0"

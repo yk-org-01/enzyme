@@ -1,4 +1,4 @@
-import './_helpers/setupAdapters';
+import './_helpers/setup';
 import React from 'react';
 import PropTypes from 'prop-types';
 import { expect } from 'chai';
