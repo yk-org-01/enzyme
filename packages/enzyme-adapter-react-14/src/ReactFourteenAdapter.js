@@ -5,8 +5,10 @@ import ReactDOMServer from 'react-dom/server';
 // eslint-disable-next-line import/no-unresolved, import/extensions
 import TestUtils from 'react-addons-test-utils';
 import values from 'object.values';
+import { isElement, isValidElementType } from 'react-is';
 import { EnzymeAdapter } from 'enzyme';
 import {
+  displayNameOfNode,
   elementToTree,
   mapNativeEventNames,
   propFromEvent,
@@ -15,11 +17,19 @@ import {
   createRenderWrapper,
   createMountWrapper,
   propsWithKeysAndRef,
+  ensureKeyOrUndefined,
+  wrap,
+  RootFinder,
+  getNodeFromRootFinder,
+  wrapWithWrappingComponent,
+  getWrappingComponentMountRenderer,
+  spyMethod,
 } from 'enzyme-adapter-utils';
+import shallowEqual from 'enzyme-shallow-equal';
 
 function typeToNodeType(type) {
   if (typeof type === 'function') {
-    if (typeof type.prototype.render === 'function') {
+    if (type.prototype && typeof type.prototype.render === 'function') {
       return 'class';
     }
     return 'function';
@@ -47,7 +57,7 @@ function instanceToTree(inst) {
       nodeType: 'host',
       type: el.type,
       props: el.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: ReactDOM.findDOMNode(inst.getPublicInstance()) || null,
       rendered: values(children).map(instanceToTree),
@@ -58,7 +68,7 @@ function instanceToTree(inst) {
       nodeType: typeToNodeType(el.type),
       type: el.type,
       props: el.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance || null,
       rendered: instanceToTree(inst._renderedComponent),
@@ -67,27 +77,45 @@ function instanceToTree(inst) {
   throw new Error('Enzyme Internal Error: unknown instance encountered');
 }
 
-class ReactFifteenAdapter extends EnzymeAdapter {
+class ReactFourteenAdapter extends EnzymeAdapter {
   constructor() {
     super();
+
+    const { lifecycles } = this.options;
     this.options = {
       ...this.options,
-      supportPrevContextArgumentOfComponentDidUpdate: true,
+      supportPrevContextArgumentOfComponentDidUpdate: true, // TODO: remove, semver-major
+      legacyContextMode: 'parent',
+      lifecycles: {
+        ...lifecycles,
+        componentDidUpdate: {
+          prevContext: true,
+        },
+        getChildContext: {
+          calledByRenderer: true,
+        },
+      },
     };
   }
+
   createMountRenderer(options) {
     assertDomAvailable('mount');
     const domNode = options.attachTo || global.document.createElement('div');
     let instance = null;
+    const adapter = this;
     return {
       render(el, context, callback) {
         if (instance === null) {
-          const ReactWrapperComponent = createMountWrapper(el, options);
-          const wrappedEl = React.createElement(ReactWrapperComponent, {
-            Component: el.type,
-            props: el.props,
+          const { type, props, ref } = el;
+          const wrapperProps = {
+            Component: type,
+            wrappingComponentProps: options.wrappingComponentProps,
+            props,
             context,
-          });
+            ...(ref && { refProp: ref }),
+          };
+          const ReactWrapperComponent = createMountWrapper(el, { ...options, adapter });
+          const wrappedEl = React.createElement(ReactWrapperComponent, wrapperProps);
           instance = ReactDOM.render(wrappedEl, domNode);
           if (typeof callback === 'function') {
             callback();
@@ -101,7 +129,14 @@ class ReactFifteenAdapter extends EnzymeAdapter {
         instance = null;
       },
       getNode() {
-        return instance ? instanceToTree(instance._reactInternalInstance).rendered : null;
+        if (!instance) {
+          return null;
+        }
+        return getNodeFromRootFinder(
+          adapter.isCustomComponent,
+          instanceToTree(instance._reactInternalInstance),
+          options,
+        );
       },
       simulateEvent(node, event, mock) {
         const mappedEvent = mapNativeEventNames(event);
@@ -114,6 +149,15 @@ class ReactFifteenAdapter extends EnzymeAdapter {
       },
       batchedUpdates(fn) {
         return ReactDOM.unstable_batchedUpdates(fn);
+      },
+      getWrappingComponentRenderer() {
+        return {
+          ...this,
+          ...getWrappingComponentMountRenderer({
+            toTree: (inst) => instanceToTree(inst._reactInternalInstance),
+            getMountWrapperInstance: () => instance,
+          }),
+        };
       },
     };
   }
@@ -130,6 +174,51 @@ class ReactFifteenAdapter extends EnzymeAdapter {
           isDOM = true;
         } else {
           isDOM = false;
+
+          const inst = renderer._instance;
+          if (inst) {
+            const { restore: restoreUpdateComponent } = spyMethod(
+              inst,
+              'updateComponent',
+              (originalUpadateComponentMethod) => function updateComponent(
+                transaction,
+                prevParentElement,
+                nextParentElement,
+                prevUnmaskedContext,
+                nextUnmaskedContext,
+              ) {
+                if (prevParentElement === nextParentElement) {
+                  const { restore: restoreProcessPendingState } = spyMethod(
+                    inst,
+                    '_processPendingState',
+                    (originalProcessPendingStateMethod) => function _processPendingState(nextProps, nextContext) {
+                      if (!shallowEqual(prevUnmaskedContext, nextUnmaskedContext)) {
+                        if (inst._instance.componentWillReceiveProps) {
+                          inst._instance.componentWillReceiveProps(nextProps, nextContext);
+                        }
+                      }
+
+                      const result = originalProcessPendingStateMethod.call(inst, nextProps, nextContext);
+                      restoreProcessPendingState();
+                      return result;
+                    },
+                  );
+                }
+
+                const result = originalUpadateComponentMethod.call(
+                  inst,
+                  transaction,
+                  prevParentElement,
+                  nextParentElement,
+                  prevUnmaskedContext,
+                  nextUnmaskedContext,
+                );
+                restoreUpdateComponent();
+                return result;
+              },
+            );
+          }
+
           return withSetStateAllowed(() => renderer.render(el, context));
         }
       },
@@ -145,7 +234,7 @@ class ReactFifteenAdapter extends EnzymeAdapter {
           nodeType: typeToNodeType(cachedNode.type),
           type: cachedNode.type,
           props: cachedNode.props,
-          key: cachedNode.key,
+          key: ensureKeyOrUndefined(cachedNode.key),
           ref: cachedNode.ref,
           instance: renderer._instance._instance,
           rendered: elementToTree(output),
@@ -198,6 +287,10 @@ class ReactFifteenAdapter extends EnzymeAdapter {
     }
   }
 
+  wrap(element) {
+    return wrap(element);
+  }
+
   // converts an RSTNode to the corresponding JSX Pragma Element. This will be needed
   // in order to implement the `Wrapper.mount()` and `Wrapper.shallow()` methods, but should
   // be pretty straightforward for people to implement.
@@ -215,13 +308,32 @@ class ReactFifteenAdapter extends EnzymeAdapter {
     return ReactDOM.findDOMNode(node.instance);
   }
 
+  displayNameOfNode(node) {
+    return displayNameOfNode(node);
+  }
+
   isValidElement(element) {
-    return React.isValidElement(element);
+    return isElement(element);
+  }
+
+  isValidElementType(object) {
+    return isValidElementType(object);
+  }
+
+  isCustomComponent(component) {
+    return typeof component === 'function';
   }
 
   createElement(...args) {
     return React.createElement(...args);
   }
+
+  wrapWithWrappingComponent(node, options) {
+    return {
+      RootFinder,
+      node: wrapWithWrappingComponent(React.createElement, node, options),
+    };
+  }
 }
 
-module.exports = ReactFifteenAdapter;
+module.exports = ReactFourteenAdapter;

@@ -1,12 +1,13 @@
 # `.mount() => Self`
 
-A method that re-mounts the component. This can be used to simulate a component going through
+A method that re-mounts the component, if it is not currently mounted. This can be used to simulate a component going through
 an unmount/mount lifecycle.
+
+No equivalent for ShallowWrappers.
 
 #### Returns
 
 `ReactWrapper`: Returns itself.
-
 
 
 #### Example
@@ -26,6 +27,7 @@ class Foo extends React.Component {
     this.componentWillMount = willMount;
     this.componentDidMount = didMount;
   }
+
   render() {
     const { id } = this.props;
     return (
@@ -40,17 +42,17 @@ Foo.propTypes = {
 };
 
 const wrapper = mount(<Foo id="foo" />);
-expect(willMount.callCount).to.equal(1);
-expect(didMount.callCount).to.equal(1);
-expect(willUnmount.callCount).to.equal(0);
+expect(willMount).to.have.property('callCount', 1);
+expect(didMount).to.have.property('callCount', 1);
+expect(willUnmount).to.have.property('callCount', 0);
 wrapper.unmount();
-expect(willMount.callCount).to.equal(1);
-expect(didMount.callCount).to.equal(1);
-expect(willUnmount.callCount).to.equal(1);
+expect(willMount).to.have.property('callCount', 1);
+expect(didMount).to.have.property('callCount', 1);
+expect(willUnmount).to.have.property('callCount', 1);
 wrapper.mount();
-expect(willMount.callCount).to.equal(2);
-expect(didMount.callCount).to.equal(2);
-expect(willUnmount.callCount).to.equal(1);
+expect(willMount).to.have.property('callCount', 2);
+expect(didMount).to.have.property('callCount', 2);
+expect(willUnmount).to.have.property('callCount', 1);
 ```
 
 

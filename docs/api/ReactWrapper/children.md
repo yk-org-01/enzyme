@@ -19,11 +19,11 @@ selector can be provided and it will filter the children by this selector
 
 ```jsx
 const wrapper = mount(<ToDoList items={items} />);
-expect(wrapper.find('ul').children()).to.have.length(items.length);
+expect(wrapper.find('ul').children()).to.have.lengthOf(items.length);
 ```
 
 #### Related Methods
 
-- [`.parents() => ReactWrapper`](parents.md)
+- [`.parents([selector]) => ReactWrapper`](parents.md)
 - [`.parent() => ReactWrapper`](parent.md)
 - [`.closest(selector) => ReactWrapper`](closest.md)

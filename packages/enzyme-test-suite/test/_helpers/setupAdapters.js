@@ -1,25 +1,40 @@
-/* eslint global-require: 0, import/no-extraneous-dependencies: 0, import/no-unresolved: 0 */
-/**
- * This file is needed only because we run our unit tests on multiple
- * versions of React at a time. This file basically figures out which
- * version of React is loaded, and configures enzyme to use the right
- * corresponding adapter.
- */
-const Version = require('./version');
+const util = require('util');
 const Enzyme = require('enzyme');
+const wrap = require('mocha-wrap');
+const inspect = require('object-inspect');
 
-let Adapter = null;
+// eslint-disable-next-line prefer-destructuring
+const resetWarningCache = require('prop-types').checkPropTypes.resetWarningCache;
 
-if (Version.REACT013) {
-  Adapter = require('enzyme-adapter-react-13');
-} else if (Version.REACT014) {
-  Adapter = require('enzyme-adapter-react-14');
-} else if (Version.REACT155) {
-  Adapter = require('enzyme-adapter-react-15');
-} else if (Version.REACT15) {
-  Adapter = require('enzyme-adapter-react-15.4');
-} else if (Version.REACT16) {
-  Adapter = require('enzyme-adapter-react-16');
-}
+const { VERSION } = require('./version');
+
+const Adapter = require('./adapter');
+
+console.error(`*** React version: v${VERSION}`);
+console.error(`*** Adapter: ${inspect(Adapter)}`);
 
 Enzyme.configure({ adapter: new Adapter() });
+
+const origWarn = console.warn;
+const origError = console.error;
+wrap.register(function withConsoleThrows() {
+  return this.withOverrides(() => console, () => ({
+    error(msg) {
+      /* eslint prefer-rest-params: 1 */
+      origError.apply(console, arguments);
+      throw new EvalError(arguments.length > 1 ? util.format.apply(util, arguments) : msg);
+    },
+    warn(msg) {
+      /* eslint prefer-rest-params: 1, prefer-spread: 1 */
+      origWarn.apply(console, arguments);
+      throw new EvalError(arguments.length > 1 ? util.format.apply(util, arguments) : msg);
+    },
+  })).extend('with console throws', {
+    beforeEach() {
+      resetWarningCache();
+    },
+    afterEach() {
+      resetWarningCache();
+    },
+  });
+});

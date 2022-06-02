@@ -1,13 +1,12 @@
 # `.isEmpty() => Boolean`
-**Deprecated**: Use [.exists()](exists.md) instead.
+**Deprecated**: Use [`.exists()`](exists.md) instead.
 
-Returns whether or not the current node is empty.
+Returns whether or not the wrapper is empty.
 
 
 #### Returns
 
-`Boolean`: whether or not the current node is empty.
-
+`Boolean`: whether or not the wrapper is empty.
 
 
 #### Example
@@ -15,5 +14,5 @@ Returns whether or not the current node is empty.
 
 ```jsx
 const wrapper = shallow(<div className="some-class" />);
-expect(wrapper.find('.other-class').isEmpty()).to.be(true);
+expect(wrapper.find('.other-class').isEmpty()).to.equal(true);
 ```

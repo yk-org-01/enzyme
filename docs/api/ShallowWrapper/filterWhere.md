@@ -20,8 +20,8 @@ provided predicate function, return true.
 
 ```jsx
 const wrapper = shallow(<MyComponent />);
-const complexFoo = wrapper.find('.foo').filterWhere(n => typeof n.type() !== 'string');
-expect(complexFoo).to.have.length(4);
+const complexFoo = wrapper.find('.foo').filterWhere((n) => typeof n.type() !== 'string');
+expect(complexFoo).to.have.lengthOf(4);
 ```
 
 

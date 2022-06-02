@@ -1,6 +1,6 @@
 # `.isEmptyRender() => Boolean`
 
-Returns whether or not the current component returns one of the allowed falsy values: `false` or `null`.
+Returns whether or not the wrapper would ultimately render only the allowed falsy values: `false` or `null`.
 
 #### Returns
 
@@ -14,5 +14,5 @@ function Foo() {
 }
 
 const wrapper = shallow(<Foo />);
-expect(wrapper.isEmptyRender()).to.be(true);
+expect(wrapper.isEmptyRender()).to.equal(true);
 ```

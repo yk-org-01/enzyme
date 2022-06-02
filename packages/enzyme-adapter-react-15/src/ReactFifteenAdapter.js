@@ -7,8 +7,10 @@ import TestUtils from 'react-dom/test-utils';
 // eslint-disable-next-line import/no-unresolved, import/extensions
 import ShallowRenderer from 'react-test-renderer/shallow';
 import values from 'object.values';
+import { isElement, isValidElementType } from 'react-is';
 import { EnzymeAdapter } from 'enzyme';
 import {
+  displayNameOfNode,
   elementToTree,
   mapNativeEventNames,
   propFromEvent,
@@ -17,6 +19,12 @@ import {
   createRenderWrapper,
   createMountWrapper,
   propsWithKeysAndRef,
+  ensureKeyOrUndefined,
+  wrap,
+  RootFinder,
+  getNodeFromRootFinder,
+  wrapWithWrappingComponent,
+  getWrappingComponentMountRenderer,
 } from 'enzyme-adapter-utils';
 
 function compositeTypeToNodeType(type) {
@@ -31,7 +39,8 @@ function compositeTypeToNodeType(type) {
 function childrenFromInst(inst, el) {
   if (inst._renderedChildren) {
     return values(inst._renderedChildren);
-  } else if (el.props) {
+  }
+  if (el.props) {
     return values({ '.0': el.props.children });
   }
   return [];
@@ -51,7 +60,8 @@ function instanceToTree(inst) {
   const el = inst._currentElement;
   if (el == null || el === false) {
     return null;
-  } else if (typeof el !== 'object') {
+  }
+  if (typeof el !== 'object') {
     return el;
   }
   if (inst._renderedChildren) {
@@ -59,7 +69,7 @@ function instanceToTree(inst) {
       nodeType: nodeType(inst),
       type: el.type,
       props: el.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance || inst._hostNode || null,
       rendered: values(inst._renderedChildren).map(instanceToTree),
@@ -70,7 +80,7 @@ function instanceToTree(inst) {
       nodeType: 'host',
       type: el.type,
       props: el.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance || inst._hostNode || null,
       rendered: childrenFromInst(inst, el).map(instanceToTree),
@@ -81,7 +91,7 @@ function instanceToTree(inst) {
       nodeType: nodeType(inst),
       type: el.type,
       props: el.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance || inst._hostNode || null,
       rendered: instanceToTree(inst._renderedComponent),
@@ -91,34 +101,54 @@ function instanceToTree(inst) {
     nodeType: nodeType(inst),
     type: el.type,
     props: el.props,
-    key: el.key,
+    key: ensureKeyOrUndefined(el.key),
     ref: el.ref,
     instance: inst._instance || null,
     rendered: childrenFromInst(inst, el).map(instanceToTree),
   };
 }
 
+const eventOptions = { animation: true };
+
 class ReactFifteenAdapter extends EnzymeAdapter {
   constructor() {
     super();
+
+    const { lifecycles } = this.options;
     this.options = {
       ...this.options,
-      supportPrevContextArgumentOfComponentDidUpdate: true,
+      supportPrevContextArgumentOfComponentDidUpdate: true, // TODO: remove, semver-major
+      legacyContextMode: 'parent',
+      lifecycles: {
+        ...lifecycles,
+        componentDidUpdate: {
+          prevContext: true,
+        },
+        getChildContext: {
+          calledByRenderer: true,
+        },
+      },
     };
   }
+
   createMountRenderer(options) {
     assertDomAvailable('mount');
     const domNode = options.attachTo || global.document.createElement('div');
     let instance = null;
+    const adapter = this;
     return {
       render(el, context, callback) {
         if (instance === null) {
-          const ReactWrapperComponent = createMountWrapper(el, options);
-          const wrappedEl = React.createElement(ReactWrapperComponent, {
-            Component: el.type,
-            props: el.props,
+          const { type, props, ref } = el;
+          const wrapperProps = {
+            Component: type,
+            wrappingComponentProps: options.wrappingComponentProps,
+            props,
             context,
-          });
+            ...(ref && { refProp: ref }),
+          };
+          const ReactWrapperComponent = createMountWrapper(el, { ...options, adapter });
+          const wrappedEl = React.createElement(ReactWrapperComponent, wrapperProps);
           instance = ReactDOM.render(wrappedEl, domNode);
           if (typeof callback === 'function') {
             callback();
@@ -132,10 +162,17 @@ class ReactFifteenAdapter extends EnzymeAdapter {
         instance = null;
       },
       getNode() {
-        return instance ? instanceToTree(instance._reactInternalInstance).rendered : null;
+        if (!instance) {
+          return null;
+        }
+        return getNodeFromRootFinder(
+          adapter.isCustomComponent,
+          instanceToTree(instance._reactInternalInstance),
+          options,
+        );
       },
       simulateEvent(node, event, mock) {
-        const mappedEvent = mapNativeEventNames(event);
+        const mappedEvent = mapNativeEventNames(event, eventOptions);
         const eventFn = TestUtils.Simulate[mappedEvent];
         if (!eventFn) {
           throw new TypeError(`ReactWrapper::simulate() event '${event}' does not exist`);
@@ -145,6 +182,15 @@ class ReactFifteenAdapter extends EnzymeAdapter {
       },
       batchedUpdates(fn) {
         return ReactDOM.unstable_batchedUpdates(fn);
+      },
+      getWrappingComponentRenderer() {
+        return {
+          ...this,
+          ...getWrappingComponentMountRenderer({
+            toTree: (inst) => instanceToTree(inst._reactInternalInstance),
+            getMountWrapperInstance: () => instance,
+          }),
+        };
       },
     };
   }
@@ -172,18 +218,20 @@ class ReactFifteenAdapter extends EnzymeAdapter {
           return elementToTree(cachedNode);
         }
         const output = renderer.getRenderOutput();
+
+        const internalInstance = renderer._instance;
         return {
-          nodeType: compositeTypeToNodeType(renderer._instance._compositeType),
+          nodeType: compositeTypeToNodeType(internalInstance._compositeType),
           type: cachedNode.type,
           props: cachedNode.props,
-          key: cachedNode.key,
+          key: ensureKeyOrUndefined(cachedNode.key),
           ref: cachedNode.ref,
-          instance: renderer._instance._instance,
+          instance: internalInstance._instance,
           rendered: elementToTree(output),
         };
       },
       simulateEvent(node, event, ...args) {
-        const handler = node.props[propFromEvent(event)];
+        const handler = node.props[propFromEvent(event, eventOptions)];
         if (handler) {
           withSetStateAllowed(() => {
             // TODO(lmr): create/use synthetic events
@@ -229,6 +277,10 @@ class ReactFifteenAdapter extends EnzymeAdapter {
     }
   }
 
+  wrap(element) {
+    return wrap(element);
+  }
+
   // converts an RSTNode to the corresponding JSX Pragma Element. This will be needed
   // in order to implement the `Wrapper.mount()` and `Wrapper.shallow()` methods, but should
   // be pretty straightforward for people to implement.
@@ -246,12 +298,36 @@ class ReactFifteenAdapter extends EnzymeAdapter {
     return ReactDOM.findDOMNode(node.instance);
   }
 
+  displayNameOfNode(node) {
+    return displayNameOfNode(node);
+  }
+
   isValidElement(element) {
-    return React.isValidElement(element);
+    return isElement(element);
+  }
+
+  isValidElementType(object) {
+    return isValidElementType(object);
+  }
+
+  isCustomComponent(component) {
+    return typeof component === 'function';
   }
 
   createElement(...args) {
     return React.createElement(...args);
+  }
+
+  invokeSetStateCallback(instance, callback) {
+    // React in >= 15.4, and < 16 pass undefined to a setState callback
+    callback.call(instance, undefined);
+  }
+
+  wrapWithWrappingComponent(node, options) {
+    return {
+      RootFinder,
+      node: wrapWithWrappingComponent(React.createElement, node, options),
+    };
   }
 }
 

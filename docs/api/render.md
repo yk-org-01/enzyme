@@ -1,7 +1,6 @@
 # Static Rendering API
 
-enzyme's `render` function is used to render react components to static HTML and analyze the
-resulting HTML structure.
+Use enzyme's `render` function to generate HTML from your React tree, and analyze the resulting HTML structure.
 
 `render` returns a wrapper very similar to the other renderers in enzyme, [`mount`](mount.md) and
 [`shallow`](shallow.md); however, `render` uses a third party HTML parsing and traversal library
@@ -11,7 +10,7 @@ disservice.
 
 For the purposes of this documentation, we will refer to Cheerio's constructor as
 `CheerioWrapper`, which is to say that it is analogous to our `ReactWrapper` and `ShallowWrapper`
-constructors.
+constructors. You can reference the [Cheerio API docs](https://github.com/cheeriojs/cheerio#api) for methods available on a `CheerioWrapper` instance.
 
 ### Example Usage
 
@@ -23,12 +22,17 @@ import PropTypes from 'prop-types';
 describe('<Foo />', () => {
   it('renders three `.foo-bar`s', () => {
     const wrapper = render(<Foo />);
-    expect(wrapper.find('.foo-bar')).to.have.length(3);
+    expect(wrapper.find('.foo-bar')).to.have.lengthOf(3);
   });
 
   it('rendered the title', () => {
     const wrapper = render(<Foo title="unique" />);
     expect(wrapper.text()).to.contain('unique');
+  });
+
+  it('renders a div', () => {
+    const wrapper = render(<div className="myClass" />);
+    expect(wrapper.html()).to.contain('div');
   });
 
   it('can pass in context', () => {

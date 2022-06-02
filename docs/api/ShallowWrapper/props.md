@@ -1,17 +1,15 @@
 # `.props() => Object`
 
-Returns the props hash for the root node of the wrapper. `.props()` can only be
-called on a wrapper of a single node.
+Returns the props object for the root node of the wrapper. It must be a single-node wrapper.
 
-NOTE: When called on a shallow wrapper, `.props()` will return values for
-props on the root node that the component *renders*, not the component itself.
-To return the props for the entire React component, use `wrapper.instance().props`.
-See [`.instance() => ReactComponent`](instance.md)
+NOTE: When called on a shallow wrapper, `.props()` will return values for props on the root node that the component *renders*, not the component itself.
+
+This method is a reliable way of accessing the props of a node; `wrapper.instance().props` will work as well, but in React 16+, stateless functional components do not have an instance. See [`.instance() => ReactComponent`](instance.md)
 
 
 #### Example
-
 ```jsx
+
 import PropTypes from 'prop-types';
 
 function MyComponent(props) {
@@ -34,8 +32,11 @@ expect(wrapper.props().includedProp).to.equal('Success!');
 console.log(wrapper.props());
 // {children: "Hello", className: "foo bar", includedProp="Success!"}
 
-console.log(wrapper.instance().props);
+console.log(wrapper.instance().props); // React 15.x - working as expected
 // {children: "Hello", className: "foo bar", includedProp:"Success!", excludedProp: "I'm not included"}
+
+console.log(wrapper.instance().props);
+// React 16.* - Uncaught TypeError: Cannot read property 'props' of null
 ```
 
 

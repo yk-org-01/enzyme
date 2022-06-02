@@ -1,10 +1,22 @@
-# Using Jest with enzyme
+# Using enzyme with Jest
+
+## Configure with Jest
+
+To run the setup file to configure Enzyme and the Adapter (as shown in the [Installation docs](https://enzymejs.github.io/enzyme/docs/installation/)) with Jest, set `setupFilesAfterEnv` (previously `setupTestFrameworkScriptFile`) in your config file (check [Jest's documentation](http://jestjs.io/docs/en/configuration) for the possible locations of that config file) to literally the string `<rootDir>` and the path to your setup file.
+
+```json
+{
+  "jest": {
+    "setupFilesAfterEnv": ["<rootDir>src/setupTests.js"]
+  }
+}
+```
 
 ## Jest version 15 and up
 
 Starting with version 15, Jest [no longer mocks modules by default](https://facebook.github.io/jest/blog/2016/09/01/jest-15.html). Because of this, you no longer have to add _any_ special configuration for Jest to use it with enzyme.
 
-Install Jest, and its Babel integrations, as recommended in the [Jest docs](https://facebook.github.io/jest/docs/getting-started.html). Install enzyme. Then, simply require/import React, enzyme functions, and your module at the top of a test file.
+Install Jest, and its Babel integrations, as recommended in the [Jest docs](https://facebook.github.io/jest/docs/en/getting-started.html). Install enzyme. Then, simply require/import React, enzyme functions, and your module at the top of a test file.
 
 ```js
 import React from 'react';
@@ -35,4 +47,4 @@ If you are using Jest 0.9 – 14.0 with enzyme and using Jest's automocking feat
 }
 ```
 
-If you are using a previous version of Jest together with npm3, you may need to unmock [more modules](https://github.com/airbnb/enzyme/blob/78febd90fe2fb184771b8b0356b0fcffbdad386e/docs/guides/jest.md).
+If you are using a previous version of Jest together with npm3, you may need to unmock [more modules](https://github.com/enzymejs/enzyme/blob/78febd90fe2fb184771b8b0356b0fcffbdad386e/docs/guides/jest.md).

@@ -6,19 +6,21 @@ import ReactContext from 'react/lib/ReactContext';
 import values from 'object.values';
 import { EnzymeAdapter } from 'enzyme';
 import {
+  displayNameOfNode,
   propFromEvent,
   withSetStateAllowed,
   assertDomAvailable,
   createRenderWrapper,
   createMountWrapper,
   propsWithKeysAndRef,
+  ensureKeyOrUndefined,
+  wrap,
 } from 'enzyme-adapter-utils';
 import mapNativeEventNames from './ReactThirteenMapNativeEventNames';
 import elementToTree from './ReactThirteenElementToTree';
 
-
 // this fixes some issues in React 0.13 with setState and jsdom...
-// see issue: https://github.com/airbnb/enzyme/issues/27
+// see issue: https://github.com/enzymejs/enzyme/issues/27
 // eslint-disable-next-line import/no-unresolved
 require('react/lib/ExecutionEnvironment').canUseDOM = true;
 
@@ -44,7 +46,7 @@ const getEmptyElementType = (() => {
 
 const createShallowRenderer = function createRendererCompatible() {
   const renderer = TestUtils.createRenderer();
-  renderer.render = (originalRender => function contextCompatibleRender(node, context = {}) {
+  renderer.render = ((originalRender) => function contextCompatibleRender(node, context = {}) {
     ReactContext.current = context;
     originalRender.call(this, React.createElement(node.type, node.props), context);
     ReactContext.current = {};
@@ -52,7 +54,6 @@ const createShallowRenderer = function createRendererCompatible() {
   })(renderer.render);
   return renderer;
 };
-
 
 function instanceToTree(inst) {
   if (typeof inst !== 'object') {
@@ -75,7 +76,7 @@ function instanceToTree(inst) {
       nodeType: 'host',
       type: el.type,
       props: el._store.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance.getDOMNode(),
       rendered: values(children).map(instanceToTree),
@@ -86,7 +87,7 @@ function instanceToTree(inst) {
       nodeType: 'class',
       type: el.type,
       props: el._store.props,
-      key: el.key,
+      key: ensureKeyOrUndefined(el.key),
       ref: el.ref,
       instance: inst._instance || inst._hostNode || null,
       rendered: instanceToTree(inst._renderedComponent),
@@ -98,24 +99,38 @@ function instanceToTree(inst) {
 class ReactThirteenAdapter extends EnzymeAdapter {
   constructor() {
     super();
+
+    const { lifecycles } = this.options;
     this.options = {
       ...this.options,
-      supportPrevContextArgumentOfComponentDidUpdate: true,
+      supportPrevContextArgumentOfComponentDidUpdate: true, // TODO: remove, semver-major
+      legacyContextMode: 'owner',
+      lifecycles: {
+        ...lifecycles,
+        componentDidUpdate: {
+          prevContext: true,
+        },
+      },
     };
   }
+
   createMountRenderer(options) {
     assertDomAvailable('mount');
     const domNode = options.attachTo || global.document.createElement('div');
     let instance = null;
+    const adapter = this;
     return {
       render(el, context, callback) {
         if (instance === null) {
-          const ReactWrapperComponent = createMountWrapper(el, options);
-          const wrappedEl = React.createElement(ReactWrapperComponent, {
-            Component: el.type,
-            props: el.props,
+          const { ref, type, props } = el;
+          const wrapperProps = {
+            Component: type,
+            props,
             context,
-          });
+            ...(ref && { ref }),
+          };
+          const ReactWrapperComponent = createMountWrapper(el, { ...options, adapter });
+          const wrappedEl = React.createElement(ReactWrapperComponent, wrapperProps);
           instance = React.render(wrappedEl, domNode);
           if (typeof callback === 'function') {
             callback();
@@ -174,7 +189,7 @@ class ReactThirteenAdapter extends EnzymeAdapter {
           nodeType: 'class',
           type: cachedNode.type,
           props: cachedNode.props,
-          key: cachedNode.key,
+          key: ensureKeyOrUndefined(cachedNode.key),
           ref: cachedNode.ref,
           instance: renderer._instance._instance,
           rendered: elementToTree(output),
@@ -227,6 +242,10 @@ class ReactThirteenAdapter extends EnzymeAdapter {
     }
   }
 
+  wrap(element) {
+    return wrap(element);
+  }
+
   // converts an RSTNode to the corresponding JSX Pragma Element. This will be needed
   // in order to implement the `Wrapper.mount()` and `Wrapper.shallow()` methods, but should
   // be pretty straightforward for people to implement.
@@ -234,6 +253,10 @@ class ReactThirteenAdapter extends EnzymeAdapter {
   nodeToElement(node) {
     if (!node || typeof node !== 'object') return null;
     return React.createElement(node.type, propsWithKeysAndRef(node));
+  }
+
+  displayNameOfNode(node) {
+    return displayNameOfNode(node);
   }
 
   elementToNode(element) {
@@ -246,6 +269,14 @@ class ReactThirteenAdapter extends EnzymeAdapter {
 
   isValidElement(element) {
     return React.isValidElement(element);
+  }
+
+  isValidElementType(object) {
+    return typeof object === 'string' || typeof object === 'function';
+  }
+
+  isCustomComponent(component) {
+    return typeof component === 'function';
   }
 
   createElement(...args) {

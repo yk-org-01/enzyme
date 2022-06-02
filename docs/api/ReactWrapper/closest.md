@@ -1,10 +1,11 @@
 # `.closest(selector) => ReactWrapper`
 
 Returns a wrapper of the first element that matches the selector by traversing up through the
-current node's ancestors in the tree, starting with itself.
+wrapped node's ancestors in the tree, starting with itself. It must be a single-node wrapper.
 
-Note: can only be called on a wrapper of a single node.
+#### Arguments
 
+1. `selector` ([`EnzymeSelector`](../selector.md)): The selector to match.
 
 #### Returns
 
@@ -16,11 +17,11 @@ Note: can only be called on a wrapper of a single node.
 
 ```jsx
 const wrapper = mount(<MyComponent />);
-expect(wrapper.find(Foo).closest('.bar')).to.have.length(1);
+expect(wrapper.find(Foo).closest('.bar')).to.have.lengthOf(1);
 ```
 
 #### Related Methods
 
-- [`.children() => ReactWrapper`](children.md)
+- [`.children([selector]) => ReactWrapper`](children.md)
 - [`.parent() => ReactWrapper`](parent.md)
-- [`.parents() => ReactWrapper`](parents.md)
+- [`.parents([selector]) => ReactWrapper`](parents.md)

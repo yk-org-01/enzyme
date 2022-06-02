@@ -1,8 +1,9 @@
-Please use [pull requests](https://github.com/airbnb/enzyme/pull/new/master) to add your organization and/or project to this document!
+Please use [pull requests](https://github.com/enzymejs/enzyme/pull/new/master) to add your organization and/or project to this document!
 
 Organizations
 ----------
  - [Airbnb](https://github.com/airbnb)
+ - [Cerner](https://github.com/cerner)
  - [OpenGov](https://github.com/opengov)
  - [Pinterest](https://github.com/pinterest)
  - [Product Hunt](https://github.com/producthunt)
@@ -24,6 +25,14 @@ Organizations
  - [Mavens](https://github.com/mavens)
  - [Cucumber](https://cucumber.io)
  - [Genoa Telepsychiatry](https://genoatelepsychiatry.com)
+ - [IBM X-Force Exchange](https://exchange.xforce.ibmcloud.com)
+ - [Zendesk](https://zendesk.com/)
+ - [idealo](https://www.idealo.de/)
+ - [LendingHome](https://www.lendinghome.com)
+ - [Diffia](https://diffia.com)
+ - [MinuteMedia](https://www.minutemedia.com)
+ - [Webex Teams](https://www.webex.com/team-collaboration.html)
+ - [reformma](https://www.reformma.com)
 
 Projects
 ----------

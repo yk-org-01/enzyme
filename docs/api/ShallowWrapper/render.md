@@ -1,14 +1,12 @@
 # `.render() => CheerioWrapper`
 
-Returns a CheerioWrapper around the rendered HTML of the current node's subtree.
-
-Note: can only be called on a wrapper of a single node.
+Returns a CheerioWrapper around the rendered HTML of the single node's subtree.
+It must be a single-node wrapper.
 
 
 #### Returns
 
 `CheerioWrapper`: The resulting Cheerio object
-
 
 
 #### Examples
@@ -31,6 +29,6 @@ function Bar() {
 
 ```jsx
 const wrapper = shallow(<Bar />);
-expect(wrapper.find('.in-foo')).to.have.length(0);
-expect(wrapper.find(Foo).render().find('.in-foo')).to.have.length(1);
+expect(wrapper.find('.in-foo')).to.have.lengthOf(0);
+expect(wrapper.render().find('.in-foo')).to.have.lengthOf(1);
 ```

@@ -4,18 +4,18 @@ The change from enzyme v2.x to v3.x is a more significant change than in previou
 due to the fact that the internal implementation of enzyme has been almost completely rewritten.
 
 The goal of this rewrite was to address a lot of the major issues that have plagued enzyme since
-its initial release. It was also to simultaneously remove a lot of the dependence that enzyme has
-on react internals, and to make enzyme more "pluggable", paving the way for enzyme to be used
+its initial release. It was also to simultaneously remove a lot of the dependencies that enzyme has
+on React internals, and to make enzyme more "pluggable", paving the way for enzyme to be used
 with "React-like" libraries such as Preact and Inferno.
 
 We have done our best to make enzyme v3 as API compatible with v2.x as possible, however there are
-a hand full of breaking changes that we decided we needed to make, intentionally, in order to
+a handful of breaking changes that we decided we needed to make, intentionally, in order to
 support this new architecture and also improve the usability of the library long-term.
 
 Airbnb has one of the largest enzyme test suites, coming in at around 30,000 enzyme unit tests.
 After upgrading enzyme to v3.x in Airbnb's code base, 99.6% of these tests succeeded with no
 modifications at all. Most of the tests that broke we found to be easy to fix, and some we found to
-actually be depending on what could arguably be considered a bug in v2.x, and the breakage was
+actually depend on what could arguably be considered a bug in v2.x, and the breakage was
 actually desired.
 
 In this guide, we will go over a couple of the most common breakages that we ran into, and how to
@@ -27,7 +27,7 @@ find a breakage that doesn't seem to make sense to you, feel free to file an iss
 
 enzyme now has an "Adapter" system. This means that you now need to install enzyme along with
 another module that provides the Adapter that tells enzyme how to work with your version of React
-(or whatever other react-like library you are using).
+(or whatever other React-like library you are using).
 
 At the time of writing this, enzyme publishes "officially supported" adapters for React 0.13.x,
 0.14.x, 15.x, and 16.x. These adapters are npm packages of the form `enzyme-adapter-react-{{version}}`.
@@ -47,7 +47,10 @@ The list of adapter npm packages for React semver ranges are as follows:
 
 | enzyme Adapter Package | React semver compatibility |
 | --- | --- |
-| `enzyme-adapter-react-16` | `^16.0.0` |
+| `enzyme-adapter-react-16` | `^16.4.0-0` |
+| `enzyme-adapter-react-16.3` | `~16.3.0-0` |
+| `enzyme-adapter-react-16.2` | `~16.2` |
+| `enzyme-adapter-react-16.1` | `~16.0.0-0 \|\| ~16.1` |
 | `enzyme-adapter-react-15` | `^15.5.0` |
 | `enzyme-adapter-react-15.4` | `15.0.0-0 - 15.4.x` |
 | `enzyme-adapter-react-14` | `^0.14.0` |
@@ -99,6 +102,49 @@ Although this is a breaking change, I believe the new behavior is closer to what
 actually expect and want. Having enzyme wrappers be immutable results in more deterministic tests
 that are less prone to flakiness from external factors.
 
+### Calling `props()` after a state change
+
+In `enzyme` v2, executing an event that would change a component state (and in turn update props) would return those updated props via the `.props` method.
+
+Now, in `enzyme` v3, you are required to re-find the component; for example:
+
+```jsx
+class Toggler extends React.Component {
+  constructor(...args) {
+    super(...args);
+    this.state = { on: false };
+  }
+
+  toggle() {
+    this.setState(({ on }) => ({ on: !on }));
+  }
+
+  render() {
+    const { on } = this.state;
+    return (<div id="root">{on ? 'on' : 'off'}</div>);
+  }
+}
+
+it('passes in enzyme v2, fails in v3', () => {
+  const wrapper = mount(<Toggler />);
+  const root = wrapper.find('#root');
+  expect(root.text()).to.equal('off');
+
+  wrapper.instance().toggle();
+
+  expect(root.text()).to.equal('on');
+});
+
+it('passes in v2 and v3', () => {
+  const wrapper = mount(<Toggler />);
+  expect(wrapper.find('#root').text()).to.equal('off');
+
+  wrapper.instance().toggle();
+
+  expect(wrapper.find('#root').text()).to.equal('on');
+});
+```
+
 ## `children()` now has slightly different meaning
 
 enzyme has a `.children()` method which is intended to return the rendered children of a wrapper.
@@ -106,13 +152,15 @@ enzyme has a `.children()` method which is intended to return the rendered child
 When using `mount(...)`, it can sometimes be unclear exactly what this would mean. Consider for
 example the following react components:
 
-<!-- eslint react/prop-types: 0, react/prefer-stateless-function: 0 -->
+<!-- eslint react/prop-types: 0, react/prefer-stateless-function: 0, max-classes-per-file: 0 -->
 ```js
 class Box extends React.Component {
   render() {
-    return <div className="box">{this.props.children}</div>;
+    const { children } = this.props;
+    return <div className="box">{children}</div>;
   }
 }
+
 class Foo extends React.Component {
   render() {
     return (
@@ -156,6 +204,25 @@ wrapper.find(Box).children().debug();
 This may seem like a subtle difference, but making this change will be important for future APIs
 we would like to introduce.
 
+## `find()` now returns host nodes and DOM nodes
+
+In some cases find will return a host node and DOM node. Take the following for example:
+
+```
+const Foo = () => <div/>;
+const wrapper = mount(
+  <div>
+    <Foo className="bar" />
+    <div className="bar"/>
+   </div>
+);
+console.log(wrapper.find('.bar').length); // 2
+```
+
+Since `<Foo/>` has the className `bar` it is returned as the _hostNode_. As expected the `<div>` with the className `bar` is also returned
+
+To avoid this you can explicity query for the DOM node: `wrapper.find('div.bar')`. Alternatively if you would like to only find host nodes use [hostNodes()](https://enzymejs.github.io/enzyme/docs/api/ShallowWrapper/hostNodes.html)
+
 ## For `mount`, updates are sometimes required when they weren't before
 
 React applications are dynamic. When testing your react components, you often want to test them
@@ -174,18 +241,23 @@ class CurrentTime extends React.Component {
       now: Date.now(),
     };
   }
+
   componentDidMount() {
     this.tick();
   }
+
   componentWillUnmount() {
     clearTimeout(this.timer);
   }
+
   tick() {
     this.setState({ now: Date.now() });
     this.timer = setTimeout(tick, 0);
   }
+
   render() {
-    return <span>{this.state.now}</span>;
+    const { now } = this.state;
+    return <span>{now}</span>;
   }
 }
 ```
@@ -216,18 +288,22 @@ class Counter extends React.Component {
     this.increment = this.increment.bind(this);
     this.decrement = this.decrement.bind(this);
   }
+
   increment() {
-    this.setState({ count: this.state.count + 1 });
+    this.setState(({ count }) => ({ count: count + 1 }));
   }
+
   decrement() {
-    this.setState({ count: this.state.count - 1 });
+    this.setState(({ count }) => ({ count: count - 1 }));
   }
+
   render() {
+    const { count } = this.state;
     return (
       <div>
-        <div className="count">Count: {this.state.count}</div>
-        <button className="inc" onClick={this.increment}>Increment</button>
-        <button className="dec" onClick={this.decrement}>Decrement</button>
+        <div className="count">Count: {count}</div>
+        <button type="button" className="inc" onClick={this.increment}>Increment</button>
+        <button type="button" className="dec" onClick={this.decrement}>Decrement</button>
       </div>
     );
   }
@@ -359,11 +435,16 @@ expect(wrapper.ref('abc')).toBeInstanceOf(Box);
 In our experience, this is most often what people would actually want and expect out of the `.ref(...)`
 method.
 
+To get the wrapper that was returned by enzyme 2:
+```js
+const wrapper = mount(<Bar />);
+const refWrapper = wrapper.findWhere((n) => n.instance() === wrapper.ref('abc'));
+```
 
 ## With `mount`, `.instance()` can be called at any level of the tree
 
 enzyme now allows for you to grab the `instance()` of a wrapper at any level of the render tree,
-not just at the root.  This means that you can `.find(...)` a specific component, then grab its
+not just at the root. This means that you can `.find(...)` a specific component, then grab its
 instance and call `.setState(...)` or any other methods on the instance that you'd like.
 
 
@@ -415,6 +496,61 @@ We don't think this should cause any breakages across enzyme v2.x to v3.x, but i
 have found something that did indeed break, please file an issue with us. Thank you to
 [Brandon Dail](https://github.com/aweary) for making this happen!
 
+## CSS Selector results and `hostNodes()`
+
+enzyme v3 now returns **all** nodes in the result set and not just html nodes.
+Consider this example:
+
+<!-- eslint react/prop-types: 0, react/prefer-stateless-function: 0, react/jsx-props-no-spreading: 0 -->
+
+```js
+const HelpLink = ({ text, ...rest }) => <a {...rest}>{text}</a>;
+
+const HelpLinkContainer = ({ text, ...rest }) => (
+  <HelpLink text={text} {...rest} />
+);
+
+const wrapper = mount(<HelpLinkContainer aria-expanded="true" text="foo" />);
+```
+
+In enzyme v3, the expression `wrapper.find("[aria-expanded=true]").length)` will
+return 3 and not 1 as in previous versions. A closer look using
+[`debug`](../api/ReactWrapper/debug.md) reveals:
+
+<!-- eslint react/prop-types: 0, react/prefer-stateless-function: 0 -->
+<!-- eslint-skip -->
+```jsx
+// console.log(wrapper.find('[aria-expanded="true"]').debug());
+
+<HelpLinkContainer aria-expanded={true} text="foo">
+  <HelpLink text="foo" aria-expanded="true">
+    <a aria-expanded="true">
+      foo
+    </a>
+  </HelpLink>
+</HelpLinkContainer>
+
+<HelpLink text="foo" aria-expanded="true">
+  <a aria-expanded="true">
+    foo
+  </a>
+</HelpLink>
+
+<a aria-expanded="true">
+  foo
+</a>
+```
+
+To return only the html nodes use the
+[`hostNodes()`](../api/ReactWrapper/hostNodes.md) function.
+
+`wrapper.find("[aria-expanded=true]").hostNodes().debug()` will now return:
+
+<!-- eslint react/prop-types: 0, react/prefer-stateless-function: 0, no-unused-expressions: 0, jsx-a11y/anchor-is-valid: 0 -->
+
+```jsx
+<a aria-expanded="true">foo</a>;
+```
 
 ## Node Equality now ignores `undefined` values
 
@@ -426,7 +562,8 @@ equivalent to the absence of a prop. Consider the following example:
 ```js
 class Foo extends React.Component {
   render() {
-    return <div className={this.props.foo} id={this.props.bar} />;
+    const { foo, bar } = this.props;
+    return <div className={foo} id={bar} />;
   }
 }
 ```

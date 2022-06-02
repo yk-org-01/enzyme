@@ -1,6 +1,9 @@
 {
-  "presets": ["airbnb"],
-  "plugins": [
-    ["transform-replace-object-assign", "object.assign"],
+  "presets": [
+    ["airbnb", { "transformRuntime": false }],
   ],
+  "plugins": [
+    ["transform-replace-object-assign", { "moduleSpecifier": "object.assign" }],
+  ],
+  "sourceMaps": "both",
 }

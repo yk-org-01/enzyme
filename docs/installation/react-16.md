@@ -7,12 +7,6 @@ installed, you should do so:
 npm i --save react@16 react-dom@16
 ```
 
-Further, enzyme requires the test utilities addon be installed:
-
-```bash
-npm i --save-dev react-test-renderer@16
-```
-
 Next, to get started with enzyme, you can simply install it with npm:
 
 ```bash
@@ -41,10 +35,10 @@ ES5:
 <!-- eslint no-var: 0 -->
 ```js
 // setup file
-var Enzyme = require('enzyme');
+var enzyme = require('enzyme');
 var Adapter = require('enzyme-adapter-react-16');
 
-configure({ adapter: new Adapter() });
+enzyme.configure({ adapter: new Adapter() });
 ```
 
 <!-- eslint no-var: 0 -->

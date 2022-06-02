@@ -1,7 +1,6 @@
 # `.prop(key) => Any`
 
-Returns the prop value for the root node of the wrapper with the provided key.
-`.prop(key)` can only be called on a wrapper of a single node.
+Returns the prop value for the root node of the wrapper with the provided key. It must be a single-node wrapper.
 
 NOTE: When called on a shallow wrapper, `.prop(key)` will return values for
 props on the root node that the component *renders*, not the component itself.
@@ -10,9 +9,7 @@ See [`.instance() => ReactComponent`](instance.md)
 
 #### Arguments
 
-1. `key` (`String`): The prop name such that this will return value will be the `this.props[key]`
-of the root node of the component.
-
+1. `key` (`String`): The prop name, that is, `this.props[key]` or `props[key]` for the root node of the wrapper.
 
 
 #### Example
@@ -20,11 +17,34 @@ of the root node of the component.
 
 ```jsx
 import PropTypes from 'prop-types';
+import ValidateNumberInputComponent from './ValidateNumberInputComponent';
 
-function MyComponent({ includedProp }) {
-  return (
-    <div className="foo bar" includedProp={includedProp}>Hello</div>
-  );
+class MyComponent extends React.Component {
+  constructor(...args) {
+    super(...args);
+
+    this.state = {
+      number: 0,
+    };
+    this.onValidNumberInput = this.onValidNumberInput.bind(this);
+  }
+
+  onValidNumberInput(e) {
+    const number = e.target.value;
+    if (!number || typeof number === 'number') {
+      this.setState({ number });
+    }
+  }
+
+  render() {
+    const { includedProp } = this.props;
+    const { number } = this.state;
+    return (
+      <div className="foo bar" includedProp={includedProp}>
+        <ValidateNumberInputComponent onChangeHandler={onValidNumberInput} number={number} />
+      </div>
+    );
+  }
 }
 MyComponent.propTypes = {
   includedProp: PropTypes.string.isRequired,
@@ -32,6 +52,14 @@ MyComponent.propTypes = {
 
 const wrapper = shallow(<MyComponent includedProp="Success!" excludedProp="I'm not included" />);
 expect(wrapper.prop('includedProp')).to.equal('Success!');
+
+const validInput = 1;
+wrapper.find('ValidateNumberInputComponent').prop('onChangeHandler')(validInput);
+expect(wrapper.state('number')).to.equal(validInput);
+
+const invalidInput = 'invalid input';
+wrapper.find('ValidateNumberInputComponent').prop('onChangeHandler')(invalidInput);
+expect(wrapper.state('number')).to.equal(0);
 
 // Warning: .prop(key) only returns values for props that exist in the root node.
 // See the note above about wrapper.instance().props to return all props in the React component.

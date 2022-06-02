@@ -3,22 +3,25 @@
 Shallow rendering is useful to constrain yourself to testing a component as a unit, and to ensure
 that your tests aren't indirectly asserting on behavior of child components.
 
+As of Enzyme v3, the `shallow` API does call React lifecycle methods such as `componentDidMount` and `componentDidUpdate`. You can read more about this in the [version 3 migration guide](../guides/migration-from-2-to-3.md#lifecycle-methods).
+
 ```jsx
 import { shallow } from 'enzyme';
 import sinon from 'sinon';
+import Foo from './Foo';
 
 describe('<MyComponent />', () => {
-  it('should render three <Foo /> components', () => {
+  it('renders three <Foo /> components', () => {
     const wrapper = shallow(<MyComponent />);
-    expect(wrapper.find(Foo)).to.have.length(3);
+    expect(wrapper.find(Foo)).to.have.lengthOf(3);
   });
 
-  it('should render an `.icon-star`', () => {
+  it('renders an `.icon-star`', () => {
     const wrapper = shallow(<MyComponent />);
-    expect(wrapper.find('.icon-star')).to.have.length(1);
+    expect(wrapper.find('.icon-star')).to.have.lengthOf(1);
   });
 
-  it('should render children when passed in', () => {
+  it('renders children when passed in', () => {
     const wrapper = shallow((
       <MyComponent>
         <div className="unique" />
@@ -31,7 +34,7 @@ describe('<MyComponent />', () => {
     const onButtonClick = sinon.spy();
     const wrapper = shallow(<Foo onButtonClick={onButtonClick} />);
     wrapper.find('button').simulate('click');
-    expect(onButtonClick.calledOnce).to.equal(true);
+    expect(onButtonClick).to.have.property('callCount', 1);
   });
 });
 
@@ -46,10 +49,10 @@ describe('<MyComponent />', () => {
   - `options.context`: (`Object` [optional]): Context to be passed into the component
   - `options.disableLifecycleMethods`: (`Boolean` [optional]): If set to true, `componentDidMount`
 is not called on the component, and `componentDidUpdate` is not called after
-[`setProps`](ShallowWrapper/setProps.md) and [`setContext`](ShallowWrapper/setContext.md). Default to `false`. 
-  - `options.lifecycleExperimental`: (`Boolean` [optional]): If set to true, the entire lifecycle
-(`componentDidMount` and `componentDidUpdate`) of the React component is called. The current default value
-is `false` with enzyme v2, but the next major version will flip the default value to `true`.
+[`setProps`](ShallowWrapper/setProps.md) and [`setContext`](ShallowWrapper/setContext.md). Default to `false`.
+  - `options.wrappingComponent`: (`ComponentType` [optional]): A component that will render as a parent of the `node`. It can be used to provide context to the `node`, among other things. See the [`getWrappingComponent()` docs](ShallowWrapper/getWrappingComponent.md) for an example. **Note**: `wrappingComponent` _must_ render its children.
+  - `options.wrappingComponentProps`: (`Object` [optional]): Initial props to pass to the `wrappingComponent` if it is specified.
+  - `options.suspenseFallback`: (`Boolean` [optional]): If set to true, when rendering `Suspense` enzyme will replace all the lazy components in children with `fallback` element prop. Otherwise it won't handle fallback of lazy component. Default to `true`. Note: not supported in React < 16.6.
 
 #### Returns
 
@@ -70,6 +73,9 @@ Remove nodes in the current wrapper that do not match the provided selector.
 #### [`.filterWhere(predicate) => ShallowWrapper`](ShallowWrapper/filterWhere.md)
 Remove nodes in the current wrapper that do not return true for the provided predicate function.
 
+#### [`.hostNodes() => ShallowWrapper`](ShallowWrapper/hostNodes.md)
+Removes nodes that are not host nodes; e.g., this will only return HTML nodes.
+
 #### [`.contains(nodeOrNodes) => Boolean`](ShallowWrapper/contains.md)
 Returns whether or not a given node or array of nodes is somewhere in the render tree.
 
@@ -77,7 +83,7 @@ Returns whether or not a given node or array of nodes is somewhere in the render
 Returns whether or not a given react element exists in the shallow render tree.
 
 #### [`.containsAllMatchingElements(nodes) => Boolean`](ShallowWrapper/containsAllMatchingElements.md)
-Returns whether or not all the given react elements exists in the shallow render tree.
+Returns whether or not all the given react elements exist in the shallow render tree.
 
 #### [`.containsAnyMatchingElements(nodes) => Boolean`](ShallowWrapper/containsAnyMatchingElements.md)
 Returns whether or not one of the given react elements exists in the shallow render tree.
@@ -94,11 +100,11 @@ Returns whether or not the current node has the given class name or not.
 #### [`.is(selector) => Boolean`](ShallowWrapper/is.md)
 Returns whether or not the current node matches a provided selector.
 
-#### [`.exists() => Boolean`](ShallowWrapper/exists.md)
-Returns whether or not the current node exists.
+#### [`.exists([selector]) => Boolean`](ShallowWrapper/exists.md)
+Returns whether or not the current node exists, or, if given a selector, whether that selector has any matching results.
 
 #### [`.isEmpty() => Boolean`](ShallowWrapper/isEmpty.md)
-*Deprecated*: Use [.exists()](ShallowWrapper/exists.md) instead.
+*Deprecated*: Use [`.exists()`](ShallowWrapper/exists.md) instead.
 
 #### [`.isEmptyRender() => Boolean`](ShallowWrapper/isEmptyRender.md)
 Returns whether or not the current component returns a falsy value.
@@ -106,13 +112,13 @@ Returns whether or not the current component returns a falsy value.
 #### [`.not(selector) => ShallowWrapper`](ShallowWrapper/not.md)
 Remove nodes in the current wrapper that match the provided selector. (inverse of `.filter()`)
 
-#### [`.children() => ShallowWrapper`](ShallowWrapper/children.md)
+#### [`.children([selector]) => ShallowWrapper`](ShallowWrapper/children.md)
 Get a wrapper with all of the children nodes of the current wrapper.
 
 #### [`.childAt(index) => ShallowWrapper`](ShallowWrapper/childAt.md)
 Returns a new wrapper with child at the specified index.
 
-#### [`.parents() => ShallowWrapper`](ShallowWrapper/parents.md)
+#### [`.parents([selector]) => ShallowWrapper`](ShallowWrapper/parents.md)
 Get a wrapper with all of the parents (ancestors) of the current node.
 
 #### [`.parent() => ShallowWrapper`](ShallowWrapper/parent.md)
@@ -127,6 +133,9 @@ Shallow renders the current node and returns a shallow wrapper around it.
 #### [`.render() => CheerioWrapper`](ShallowWrapper/render.md)
 Returns a CheerioWrapper of the current node's subtree.
 
+#### [`.renderProp(key)() => ShallowWrapper`](ShallowWrapper/renderProp.md)
+Returns a wrapper of the node rendered by the provided render prop.
+
 #### [`.unmount() => ShallowWrapper`](ShallowWrapper/unmount.md)
 A method that un-mounts the component.
 
@@ -139,11 +148,11 @@ Returns a static HTML rendering of the current node.
 #### [`.get(index) => ReactElement`](ShallowWrapper/get.md)
 Returns the node at the provided index of the current wrapper.
 
-#### [`.getNode() => ReactElement`](ShallowWrapper/getNode.md)
-Returns the wrapper's underlying node.
+#### [`.getElement() => ReactElement`](ShallowWrapper/getElement.md)
+Returns the wrapped ReactElement.
 
-#### [`.getNodes() => Array<ReactElement>`](ShallowWrapper/getNodes.md)
-Returns the wrapper's underlying nodes.
+#### [`.getElements() => Array<ReactElement>`](ShallowWrapper/getElements.md)
+Returns the wrapped ReactElements.
 
 #### [`.at(index) => ShallowWrapper`](ShallowWrapper/at.md)
 Returns a wrapper of the node at the provided index of the current wrapper.
@@ -169,28 +178,34 @@ Returns the named prop of the current node.
 #### [`.key() => String`](ShallowWrapper/key.md)
 Returns the key of the current node.
 
+#### [`.invoke(propName)(...args) => Any`](ShallowWrapper/invoke.md)
+Invokes a prop function on the current node and returns the function's return value.
+
 #### [`.simulate(event[, data]) => ShallowWrapper`](ShallowWrapper/simulate.md)
 Simulates an event on the current node.
 
 #### [`.setState(nextState) => ShallowWrapper`](ShallowWrapper/setState.md)
 Manually sets state of the root component.
 
-#### [`.setProps(nextProps) => ShallowWrapper`](ShallowWrapper/setProps.md)
+#### [`.setProps(nextProps[, callback]) => ShallowWrapper`](ShallowWrapper/setProps.md)
 Manually sets props of the root component.
 
 #### [`.setContext(context) => ShallowWrapper`](ShallowWrapper/setContext.md)
 Manually sets context of the root component.
 
+#### [`.getWrappingComponent() => ShallowWrapper`](ShallowWrapper/getWrappingComponent.md)
+Returns a wrapper representing the `wrappingComponent`, if one was passed.
+
 #### [`.instance() => ReactComponent`](ShallowWrapper/instance.md)
 Returns the instance of the root component.
 
 #### [`.update() => ShallowWrapper`](ShallowWrapper/update.md)
-Calls `.forceUpdate()` on the root component instance.
+Syncs the enzyme component tree snapshot with the react component tree.
 
 #### [`.debug() => String`](ShallowWrapper/debug.md)
 Returns a string representation of the current shallow render tree for debugging purposes.
 
-#### [`.type() => String|Function`](ShallowWrapper/type.md)
+#### [`.type() => String|Function|null`](ShallowWrapper/type.md)
 Returns the type of the current node of the wrapper.
 
 #### [`.name() => String`](ShallowWrapper/name.md)
